@@ -6,4 +6,7 @@ Created on Tue Jun 13 09:17:01 2023
 @author: willalbert
 """
 
-print("eee")
+folder_path = "/home/willalbert/Desktop"
+file_name = "segmentedSteMarthe.ply"
+
+file_name_prob = "segmentedSteMarthePROB.ply"

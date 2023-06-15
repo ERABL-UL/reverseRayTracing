@@ -13,67 +13,23 @@ Created on Tue Jun 13 09:13:46 2023
 #
 
 # Common libs
-import signal
 import os
 import numpy as np
-import sys
-import torch
 import OSToolBox as ost
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-#from utils.config import Config
-from occupancyGrid import generate_occupancy_grid
-from os.path import exists, join
-
-import wandb
-
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#           Config Class
-#       \******************/
-#
-
-# class revRayTracingConfig(Config):
-#     """
-#     Override the parameters you want to modify for this dataset
-#     """
-
-#     ####################
-#     # Dataset parameters
-#     ####################
-
-#     # Dataset name
-#     dataset = 'Kitti-360'
-
-#     # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
-#     class_to_extract = None
+from utils import Config
+from OccupancyGrid import generate_occupancy_grid
+from os.path import join
 
 
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#           Main Call
-#       \***************/
-#
-
-if __name__ == '__main__':
+def createVoxels():
+    config = Config
     
-    #################
-    # Initialization
-    #################
-    
-    folder_path = "/home/willalbert/Desktop"
-    file_name = "segmentedSteMarthe.ply"
+    folder_path = config.folder_path
+    file_name = config.file_name
     file_path = join(folder_path, file_name)
-    file_name_prob = "segmentedSteMarthePROB.ply"
+    file_name_prob = config.file_name_prob
     file_path_prob = join(folder_path, file_name_prob)
-
-    # Set which gpu is going to be used
-    GPU_ID = '0'
-
-    # Set GPU visible device
-    os.environ['CUDA_VISIBLE_DEVICES'] = GPU_ID
     
     pntCloud = ost.read_ply(file_path)
     building_inds = np.where(pntCloud["scalar_label"].astype(np.int32) == 6)[0]
@@ -83,8 +39,6 @@ if __name__ == '__main__':
     z = pntCloud["z"]
     lbl = pntCloud["scalar_label"]
     points = np.c_[x, y, z, lbl]
-    
-    p = points[building_inds]
     
     # Grille d'occupation
     voxel_size = 0.5        # metres
@@ -108,9 +62,6 @@ if __name__ == '__main__':
     y = np.reshape(y, (-1,))
     z = np.reshape(z, (-1,))
     
-    
     p = np.c_[x, y, z, occupied_voxels]
     
-    ost.write_ply(join(folder_path, "occGrid.ply"), p, ["x","y","z","occ"])
-    
-    print('Finished')
+    return p
