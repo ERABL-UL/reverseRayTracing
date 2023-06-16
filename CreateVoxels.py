@@ -32,7 +32,6 @@ def createVoxels():
     file_path_prob = join(folder_path, file_name_prob)
     
     pntCloud = ost.read_ply(file_path)
-    building_inds = np.where(pntCloud["scalar_label"].astype(np.int32) == 6)[0]
     
     x = pntCloud["x"]
     y = pntCloud["y"]

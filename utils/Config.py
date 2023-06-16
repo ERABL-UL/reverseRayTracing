@@ -6,7 +6,7 @@ Created on Tue Jun 13 09:17:01 2023
 @author: willalbert
 """
 
-folder_path = "/home/willalbert/Desktop"
+folder_path = "/home/willalbert/Documents/GitHub/reverseRayTracing"
 file_name = "segmentedSteMarthe.ply"
 
 file_name_prob = "segmentedSteMarthePROB.ply"
