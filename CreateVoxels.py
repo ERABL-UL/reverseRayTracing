@@ -36,7 +36,7 @@ def createVoxels():
     x = pntCloud["x"]
     y = pntCloud["y"]
     z = pntCloud["z"]
-    lbl = pntCloud["scalar_label"]
+    lbl = pntCloud["pre"]
     points = np.c_[x, y, z, lbl]
     
     # Grille d'occupation

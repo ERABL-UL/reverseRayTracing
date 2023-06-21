@@ -14,20 +14,26 @@ import OSToolBox as ost
 from os.path import join
 import open3d as o3d
 
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 
 if __name__ == "__main__":
     config = Config
     p = createVoxels()
     ost.write_ply(join(config.folder_path, "OUT/occGrid.ply"), p, ["x","y","z","occ"])
     
-    # Compute normal of road
-    idx_class = 1
-    ply_path = extractClass(idx_class)
+    idx_class = 1       # 1 == flat
+    name_class = "flat"
+    name_scalar = "pre"
+    ply_path = extractClass(idx_class, name_scalar, name_class)
+    flat = ost.read_ply(ply_path)
     
-    road_pnt_cloud = o3d.io.read_point_cloud(ply_path)
-    road_pnt_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.75))
-    normals = road_pnt_cloud.normals
+    idx_class = 6       # 1 == building
+    name_class = "building"
+    name_scalar = "pre"
+    ply_path = extractClass(idx_class, name_scalar, name_class)
+    building = ost.read_ply(ply_path)
     
-    
-    
-    print('Finished')
+    print('Finished')   
