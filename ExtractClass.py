@@ -12,21 +12,26 @@ from os.path import join
 
 def extractClass(idx_class, name_scalar, name_class):
     config = Config
+    print("\n###################")
+    print("Extracting the class '{}' with label index {} from point cloud {} ...".format(name_class, idx_class, config.file_name_read))
     
-    folder_path_in = config.folder_path_in
-    folder_path_out = config.folder_path_out
-    file_name = config.file_name
+    pntCloud = ost.read_ply(join(config.folder_path_in, config.file_name_read))
+    x = pntCloud['x']
+    y = pntCloud['y']
+    z = pntCloud['z']
+    lbl= pntCloud[name_scalar]
+    pnt_array = np.c_[x, y, z, lbl]
     
-    pntCloud = ost.read_ply(join(folder_path_in, file_name))
-    inds = np.where(pntCloud[name_scalar].astype(np.int32) == idx_class)[0].astype(np.int32)
+    inds = np.where(lbl.astype(np.int32) != idx_class)[0].astype(np.int32)
     
-    points = []
-    for i in pntCloud:
-        points.append(list(i))
-    points = np.array(points)
-    print(points.ndim)
-    ply_path = join(folder_path_out, name_class + "_extraction.ply")
+    pnt_extract = np.delete(pnt_array, inds, axis=0)
+
+    ply_path_extracted = join(config.folder_path_out, name_class + "_extraction.ply")
     
-    ost.write_ply(ply_path, points, ["x","y","z","scalar_label"])
+    ost.write_ply(ply_path_extracted, pnt_extract, ["x","y","z","scalar_label"])
     
-    return ply_path
+    print("Points extracted with success!\nA ply file has been created here: {}".format(ply_path_extracted))
+    print("###################")
+    
+    return ply_path_extracted
+

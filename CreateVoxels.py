@@ -21,35 +21,34 @@ from utils import Config
 from OccupancyGrid import generate_occupancy_grid
 from os.path import join
 
+import multiprocessing
+from functools import partial
+    
 
-def createVoxels():
+def createVoxels(name_scalar):
     config = Config
+    print("\n###################")
+    print("Creating voxels of {} meters from point cloud {} ...".format(config.voxel_size, config.file_name_read))
     
-    folder_path = config.folder_path
-    file_name = config.file_name
-    file_path = join(folder_path, file_name)
-    file_name_prob = config.file_name_prob
-    file_path_prob = join(folder_path, file_name_prob)
-    
-    pntCloud = ost.read_ply(file_path)
+    file_path_read = join(config.folder_path_in, config.file_name_read)
+    pntCloud = ost.read_ply(file_path_read)
     
     x = pntCloud["x"]
     y = pntCloud["y"]
     z = pntCloud["z"]
-    lbl = pntCloud["pre"]
+    lbl = pntCloud[name_scalar]
     points = np.c_[x, y, z, lbl]
     
     # Grille d'occupation
-    voxel_size = 0.5        # metres
-    occupancy_grid, min_coords = generate_occupancy_grid(points, voxel_size)
+    occupancy_grid, min_coords = generate_occupancy_grid(points, config.voxel_size)
     
     # Generate voxel grid coordinates
     x, y, z = np.indices(occupancy_grid.shape)
     
     # Convert voxel indices to world coordinates
-    x = x * voxel_size + min_coords[0]
-    y = y * voxel_size + min_coords[1]
-    z = z * voxel_size + min_coords[2]
+    x = x * config.voxel_size + min_coords[0]
+    y = y * config.voxel_size + min_coords[1]
+    z = z * config.voxel_size + min_coords[2]
     
     nb_ligne = occupancy_grid.shape[0]
     nb_col = occupancy_grid.shape[1]
@@ -62,5 +61,10 @@ def createVoxels():
     z = np.reshape(z, (-1,))
     
     p = np.c_[x, y, z, occupied_voxels]
+    ply_path_voxels = join(config.folder_path_out, "occGrid.ply")
+    ost.write_ply(ply_path_voxels, p, ["x","y","z","occ"])
     
-    return p
+    print("Voxels created with success!\nA ply file has been created here: {}".format(ply_path_voxels))
+    print("###################")
+    
+    return ply_path_voxels
