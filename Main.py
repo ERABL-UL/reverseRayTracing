@@ -13,13 +13,8 @@ from ExtractClass import extractClass
 from ComputeNormals import compute_surface_normals, compute_surface_normals_RG
 from CheckPerpendicular import checkPerpendicular
 import OSToolBox as ost
-from os.path import join
-import open3d as o3d
 
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
 
 
 if __name__ == "__main__":
@@ -27,7 +22,6 @@ if __name__ == "__main__":
    
     name_scalar = "scalar_pre"
     ply_path_voxels = createVoxels(name_scalar)
-    # ply_path_voxels = createVoxels(name_scalar)
     
     idx_class = 1       # 1 == flat
     name_class = "flat"

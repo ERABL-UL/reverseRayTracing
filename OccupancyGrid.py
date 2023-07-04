@@ -7,8 +7,10 @@ Created on Wed Jun 14 13:22:33 2023
 """
 
 import numpy as np
+from collections import Counter
 
 def generate_occupancy_grid(point_cloud, voxel_size):
+    print("  - Generating the occupancy grid with labels of every points in each voxel ...")
     # Determine the minimum and maximum coordinates of the point cloud
     min_coords = np.min(point_cloud, axis=0)[:3]
     max_coords = np.max(point_cloud, axis=0)[:3]
@@ -17,7 +19,9 @@ def generate_occupancy_grid(point_cloud, voxel_size):
     grid_dims = np.ceil((max_coords - min_coords) / voxel_size).astype(int)
 
     # Create an empty occupancy grid
-    occupancy_grid = np.zeros(grid_dims, dtype=bool)
+    #occupancy_grid = np.zeros(grid_dims, dtype=bool)
+    label_histo_grid = np.zeros(grid_dims, dtype=list)
+    #label_grid = np.zeros(grid_dims, dtype=int)
 
     # Iterate through each point in the point cloud
     for point in point_cloud:
@@ -25,7 +29,37 @@ def generate_occupancy_grid(point_cloud, voxel_size):
         voxel_indices = np.floor((point[:3] - min_coords) / voxel_size).astype(int)
 
         # Mark the corresponding voxel as occupied
-        occupancy_grid[tuple(voxel_indices)] = True
+        #occupancy_grid[tuple(voxel_indices)] = True
+        if label_histo_grid[tuple(voxel_indices)] == 0:
+            label_histo_grid[tuple(voxel_indices)] = [point[3]]
+        else:
+            label_histo_grid[tuple(voxel_indices)].append(point[3])
+                    
+    print("    Done with success")
+    
+    return label_histo_grid, min_coords
 
-    return occupancy_grid, min_coords
+def generate_single_occ_grid(label_histo_grid):
+    print("  - Generating occupancy grid with the most popular label for each voxel ...")
+    
+    nb_ligne = label_histo_grid.shape[0]
+    nb_col = label_histo_grid.shape[1]
+    nb_haut = label_histo_grid.shape[2]
+    
+    label_grid = np.zeros((nb_ligne,nb_col,nb_haut), dtype=int)
+    
+    # Iterate through each point in the point cloud
+    for i in np.arange(nb_ligne):
+        for j in np.arange(nb_col):
+            for k in np.arange(nb_haut):
+                # Get the most common lbl in the voxel
+                lst = label_histo_grid[tuple((int(i),int(j),int(k)))]
+                if lst != 0: 
+                    label_grid[tuple((i,j,k))] = Counter(lst).most_common(1)[0][0]
+                else:
+                    label_grid[tuple((i,j,k))] = 0 #https://stackoverflow.com/questions/6987285/find-the-item-with-maximum-occurrences-in-a-list
+    
+    del label_histo_grid
+    print("    Done with success")
 
+    return label_grid
