@@ -12,6 +12,7 @@ from utils import Config
 import OSToolBox as ost
 from os.path import join
 from sklearn.neighbors import NearestNeighbors
+import cv2 as cv
 
 
 def compute_surface_normals(radius, nn, file_path_read, file_name_out):
@@ -48,7 +49,6 @@ def compute_surface_normals(radius, nn, file_path_read, file_name_out):
     print("###################")
     
     return ply_path_normals
-
 
 
 def compute_surface_normals_RG(nn, file_path_read, file_name_out):

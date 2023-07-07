@@ -32,6 +32,7 @@ def createVoxels(name_scalar, ply_path_horiz):
     file_path_read = join(config.folder_path_in, config.file_name_read)
     pntCloud = ost.read_ply(file_path_read)
     
+    # Hole point cloud
     x = pntCloud["x"]
     y = pntCloud["y"]
     z = pntCloud["z"]
@@ -65,8 +66,10 @@ def createVoxels(name_scalar, ply_path_horiz):
     # Grille d'occupation
     label_histo_grid, normal_histo_grid, min_coords = generate_occupancy_grid(points, config.voxel_size)
     del points                  # Freeing space, useful when debugging
+    
+    # Check which label is the most common in each voxel
     label_grid = generate_single_occ_grid(label_histo_grid)
-    normal_grid = generate_single_occ_grid(normal_histo_grid)
+    #normal_grid = generate_single_occ_grid(normal_histo_grid)
     del label_histo_grid        # Freeing space, useful when debugging
     
     # Generate voxel grid coordinates
@@ -93,3 +96,23 @@ def createVoxels(name_scalar, ply_path_horiz):
     print("###################")
     
     return ply_path_voxels
+
+
+
+def createBlob(voxels_path):
+    voxels_path = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
+    voxels = ost.read_ply(voxels_path)
+    
+    x = voxels["x"]
+    y = voxels["y"]
+    z = voxels["z"]
+    lbl = voxels['lbl']
+    voxels2D = np.c_[x, y, z, lbl]
+    
+    for i in x:
+        for j in y:
+            for k in z:
+                if voxels2D[i,j,k][3] == 6:
+                    voxelsBlob[i,j][2]
+    
+    return 0
