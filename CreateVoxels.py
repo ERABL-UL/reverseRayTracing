@@ -16,6 +16,10 @@ Created on Tue Jun 13 09:13:46 2023
 import os
 import numpy as np
 import OSToolBox as ost
+import cv2
+from PIL import Image
+import torch
+import matplotlib.pyplot as plt
 
 from utils import Config
 from OccupancyGrid import generate_occupancy_grid, generate_single_occ_grid
@@ -100,19 +104,111 @@ def createVoxels(name_scalar, ply_path_horiz):
 
 
 def createBlob(voxels_path):
-    voxels_path = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
+    config = Config
+    
+    voxels_path = join(config.folder_path_out,"occGrid.ply")
     voxels = ost.read_ply(voxels_path)
     
     x = voxels["x"]
     y = voxels["y"]
-    z = voxels["z"]
+    #z = voxels["z"]
     lbl = voxels['lbl']
-    voxels2D = np.c_[x, y, z, lbl]
+    voxels3D_flat = np.c_[x, y, lbl]
     
-    for i in x:
-        for j in y:
-            for k in z:
-                if voxels2D[i,j,k][3] == 6:
-                    voxelsBlob[i,j][2]
+    idx = np.where(6. == lbl)[0]
+    voxels3D_flat_6 = voxels3D_flat[idx, :]
+    voxels3D_flat_6[:, -1] = True
+    voxels3D_flat_6 = np.unique(voxels3D_flat_6, axis=0)
     
-    return 0
+    xMin = min(voxels3D_flat_6[:,0])
+    yMin = min(voxels3D_flat_6[:,1])
+    
+    xs = np.array((voxels3D_flat_6[:,0]-xMin)/config.voxel_size, dtype = int)
+    ys = np.array((voxels3D_flat_6[:,1]-yMin)/config.voxel_size, dtype = int)  * -1         # Miltuplying by -1 because the origin of an image is at the top left corner
+    
+    ost.write_ply(join(config.folder_path_out,"voxels2Dessay.ply"), voxels3D_flat_6, ["x","y","building"])
+    
+    sizeX = max(xs)-min(xs)
+    sizeX = int(np.ceil(sizeX))
+    sizeY = max(ys)-min(ys)
+    sizeY = int(np.ceil(sizeY))
+    
+    num_points = xs.shape[0]
+    
+    # Create an empty image
+    image = Image.new('RGB', (sizeX+1, sizeY+1), (255, 255, 255))
+    # Set pixel colors based on point cloud
+    pixels = image.load()
+    for i in np.arange(num_points-1):
+        pixels[xs[i], ys[i]] = (0, 0, 0)  # Set point cloud color (black)
+        
+    image.save(join(config.folder_path_out,"blob.png"), 'PNG')
+    
+    return join(config.folder_path_out,"blob.png"), xMin, yMin
+
+
+def findCenters(img_path):
+    config = Config
+    img_path = join(config.folder_path_out,"blob.png")
+    # read image through command line
+    inputImage = cv2.imread(img_path)
+    inputCopy = inputImage.copy()
+    
+    grayInput = cv2.cvtColor(inputImage, cv2.COLOR_BGR2GRAY)
+    _, binaryImage = cv2.threshold(grayInput, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+    
+    # Set kernel (structuring element) size:
+    kernelSize = (1, 1)
+    
+    # Set operation iterations:
+    opIterations = 10
+    
+    # Get the structuring element:
+    morphKernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernelSize)
+    
+    # Perform Dilate:
+    dilateImage = cv2.morphologyEx(binaryImage, cv2.MORPH_DILATE, morphKernel, None, None, opIterations, cv2.BORDER_REFLECT101)
+    centroids = []
+    
+    # Find the contours on the binary image:
+    contours, _ = cv2.findContours(dilateImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    ratioWH = 0.2
+    
+    # Look for the outer bounding boxes (no children):
+    for _, cnt in enumerate(contours):
+        area = cv2.contourArea(cnt)
+        rect = cv2.minAreaRect(cnt)     # returns (x_center, y_center), (width, height), theta
+        (x_center, y_center), (width, height), theta = rect
+        
+        if (55 < area < 900) and height != 0 and (ratioWH < abs(width/height) < 1/ratioWH):
+            box0 = cv2.boxPoints(rect)
+            box = np.rint(box0).astype(int)
+            
+            x_center = int(np.round(x_center))
+            y_center = int(np.round(y_center))
+            centroids.append([x_center, y_center])
+            
+            cv2.circle(inputCopy, (x_center, y_center), 4, (255, 255, 0), -1)
+            cv2.drawContours(inputCopy,[box],0,(0,0,255),2)
+            
+    # Uncomment to visialize
+    # cv2.imshow("Bounding Rectangles", inputCopy)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
+    
+    return np.asarray(centroids).astype(float)
+
+
+def centroidsImgToPnt(centroids_img, xMin, yMin):
+    config = Config
+    
+    centroids_pnt = centroids_img.copy()
+    
+    #centroids_pnt[:,1] *= -1
+    centroids_pnt *= config.voxel_size
+    
+    # centroids_pnt[:,0] += xMin
+    # centroids_pnt[:,1] += yMin
+    
+    return centroids_pnt

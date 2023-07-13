@@ -8,7 +8,7 @@ Created on Thu Jun 15 16:57:20 2023
 
 
 from utils import Config
-from CreateVoxels import createVoxels
+from CreateVoxels import createVoxels, createBlob, findCenters, centroidsImgToPnt
 from ExtractClass import extractClass
 from ComputeNormals import compute_surface_normals, compute_surface_normals_RG
 from CheckPerpendicular import checkPerpendicular
@@ -59,6 +59,12 @@ if __name__ == "__main__":
         
     if 'ply_path_voxels' not in globals():
         ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
+        
+    blob_path, xMin, yMin = createBlob(ply_path_voxels)
+    centroids_img = findCenters(blob_path)          # Centroids in the image. NOT IN THE POINT CLOUD
+    centroids_pnt = centroidsImgToPnt(centroids_img, xMin, yMin)
+    
+    ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/centroids.ply", centroids_pnt, ['x', 'y'])
     
     r = revRayTracing(ply_path_voxels, ply_path_normals, 6, 1)        # 6: Building   1: Flat
     print(r)
