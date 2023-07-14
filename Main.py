@@ -56,11 +56,26 @@ if __name__ == "__main__":
     # Create Voxel Grid
     name_scalar = "scalar_pre"
     ply_path_voxels = createVoxels(name_scalar, ply_path_horiz = '/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz.ply')
-        
+    
+    
+    from utils import Config
+    from CreateVoxels import createVoxels, createBlob, findCenters, centroidsImgToPnt
+    from ExtractClass import extractClass
+    from ComputeNormals import compute_surface_normals, compute_surface_normals_RG
+    from CheckPerpendicular import checkPerpendicular
+    from RevRayTracing import revRayTracing
+    import OSToolBox as ost
+    from os.path import join
+    import numpy as np
+    from utils import Config as config
+
+    
     if 'ply_path_voxels' not in globals():
         ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
         
     blob_path, xMin, yMin = createBlob(ply_path_voxels)
+    
+    blob_path = join(config.folder_path_out,"blob.png")
     centroids_img = findCenters(blob_path)          # Centroids in the image. NOT IN THE POINT CLOUD
     centroids_pnt = centroidsImgToPnt(centroids_img, xMin, yMin)
     

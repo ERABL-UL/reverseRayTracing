@@ -122,9 +122,10 @@ def createBlob(voxels_path):
     
     xMin = min(voxels3D_flat_6[:,0])
     yMin = min(voxels3D_flat_6[:,1])
+    yMax = max(voxels3D_flat_6[:,1])
     
-    xs = np.array((voxels3D_flat_6[:,0]-xMin)/config.voxel_size, dtype = int)
-    ys = np.array((voxels3D_flat_6[:,1]-yMin)/config.voxel_size, dtype = int)  * -1         # Miltuplying by -1 because the origin of an image is at the top left corner
+    xs = np.array((voxels3D_flat_6[:,0]-xMin)*2, dtype = int)
+    ys = np.array((voxels3D_flat_6[:,1]-yMin)*2, dtype = int)
     
     ost.write_ply(join(config.folder_path_out,"voxels2Dessay.ply"), voxels3D_flat_6, ["x","y","building"])
     
@@ -142,14 +143,14 @@ def createBlob(voxels_path):
     for i in np.arange(num_points-1):
         pixels[xs[i], ys[i]] = (0, 0, 0)  # Set point cloud color (black)
         
-    image.save(join(config.folder_path_out,"blob.png"), 'PNG')
+    image.save(join(config.folder_path_out,"blob.png"), 'PNG')      # The image will be mirrored because the origin of the image is at the top left corner
     
     return join(config.folder_path_out,"blob.png"), xMin, yMin
 
 
 def findCenters(img_path):
     config = Config
-    img_path = join(config.folder_path_out,"blob.png")
+    #img_path = join(config.folder_path_out,"blob.png")
     # read image through command line
     inputImage = cv2.imread(img_path)
     inputCopy = inputImage.copy()
@@ -161,7 +162,7 @@ def findCenters(img_path):
     kernelSize = (1, 1)
     
     # Set operation iterations:
-    opIterations = 10
+    opIterations = 5
     
     # Get the structuring element:
     morphKernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernelSize)
@@ -173,15 +174,17 @@ def findCenters(img_path):
     # Find the contours on the binary image:
     contours, _ = cv2.findContours(dilateImage, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    ratioWH = 0.2
+    ratioWH = 0.5
     
     # Look for the outer bounding boxes (no children):
     for _, cnt in enumerate(contours):
         area = cv2.contourArea(cnt)
         rect = cv2.minAreaRect(cnt)     # returns (x_center, y_center), (width, height), theta
         (x_center, y_center), (width, height), theta = rect
+        peri = cv2.arcLength(cnt, True) 
         
-        if (55 < area < 900) and height != 0 and (ratioWH < abs(width/height) < 1/ratioWH):
+        if (125 < area < 3000) and height != 0 and (ratioWH < abs(width/height) < 1/ratioWH):
+        # if height != 0:
             box0 = cv2.boxPoints(rect)
             box = np.rint(box0).astype(int)
             
@@ -193,9 +196,10 @@ def findCenters(img_path):
             cv2.drawContours(inputCopy,[box],0,(0,0,255),2)
             
     # Uncomment to visialize
-    # cv2.imshow("Bounding Rectangles", inputCopy)
-    # cv2.waitKey()
-    # cv2.destroyAllWindows()
+    # Note that the image will be mirrored because the origin of the image is at the top left corner
+    cv2.imshow("Bounding Rectangles", inputCopy)
+    cv2.waitKey()
+    cv2.destroyAllWindows()
     
     return np.asarray(centroids).astype(float)
 
@@ -204,11 +208,10 @@ def centroidsImgToPnt(centroids_img, xMin, yMin):
     config = Config
     
     centroids_pnt = centroids_img.copy()
+    centroids_pnt[:,0] /= 2
+    centroids_pnt[:,1] /= 2
     
-    #centroids_pnt[:,1] *= -1
-    centroids_pnt *= config.voxel_size
-    
-    # centroids_pnt[:,0] += xMin
-    # centroids_pnt[:,1] += yMin
+    centroids_pnt[:,0] += xMin
+    centroids_pnt[:,1] += yMin
     
     return centroids_pnt
