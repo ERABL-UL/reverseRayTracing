@@ -21,6 +21,11 @@ import numpy as np
 from scipy.interpolate import griddata
 
 
+def uniformNormals():
+    
+    return 0
+
+
 def revRayTracing(ply_path_voxels, ply_path_normals):
     config = Config
     

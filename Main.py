@@ -8,12 +8,14 @@ Created on Thu Jun 15 16:57:20 2023
 
 
 from utils import Config
-from CreateVoxels import createVoxels, createBlob, findCenters, centroidsImgToPnt
+from CreateVoxels import preparationVoxels, createBlob, findCenters, coordsImgToPnt
 from ExtractClass import extractClass
 from ComputeNormals import compute_surface_normals, compute_surface_normals_RG
 from CheckPerpendicular import checkPerpendicular
-from RevRayTracing import revRayTracing
+from RevRayTracing import revRayTracing, uniformNormals
 import OSToolBox as ost
+from OccupancyGrid import generate_occupancy_grid, generate_single_occ_grid
+
 
 import numpy as np
 
@@ -53,35 +55,32 @@ if __name__ == "__main__":
         file_name_out = name_class + "_horiz.ply"
         ply_path_horiz = checkPerpendicular(ply_path_normals, file_name_out)
         
+    
     # Create Voxel Grid
     name_scalar = "scalar_pre"
-    ply_path_voxels = createVoxels(name_scalar, ply_path_horiz = '/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz.ply')
+    points = preparationVoxels(name_scalar, ply_path_horiz = '/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz.ply')
+
+    grid_type = "normal"
+    histo_grid, min_coords = generate_occupancy_grid(points, config.voxel_size, grid_type)
+    del points
+    # Check which label is the most common in each voxel
+    ply_path_voxels = generate_single_occ_grid(histo_grid, grid_type, min_coords)
     
-    
-    from utils import Config
-    from CreateVoxels import createVoxels, createBlob, findCenters, centroidsImgToPnt
-    from ExtractClass import extractClass
-    from ComputeNormals import compute_surface_normals, compute_surface_normals_RG
-    from CheckPerpendicular import checkPerpendicular
-    from RevRayTracing import revRayTracing
-    import OSToolBox as ost
-    from os.path import join
-    import numpy as np
-    from utils import Config as config
 
     
-    if 'ply_path_voxels' not in globals():
-        ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
+    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid.ply"
         
-    blob_path, xMin, yMin = createBlob(ply_path_voxels)
+    label = 6.
+    blob_path, xMin, yMin = createBlob(ply_path_voxels, label, grid_type)
     
-    blob_path = join(config.folder_path_out,"blob.png")
-    centroids_img = findCenters(blob_path)          # Centroids in the image. NOT IN THE POINT CLOUD
-    centroids_pnt = centroidsImgToPnt(centroids_img, xMin, yMin)
+    # blob_path = join(config.folder_path_out,"blob.png")
+    centroidsCoord_img, cornersCoord_img = findCenters(blob_path)          # Centroids in the image. NOT IN THE POINT CLOUD COORDINATES
+    centroidsCoord_pnt, cornersCoord_pnt = coordsImgToPnt(centroidsCoord_img, cornersCoord_img, xMin, yMin)
     
-    ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/centroids.ply", centroids_pnt, ['x', 'y'])
+    # ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/centroids.ply", centroidsCoord_pnt, ['x', 'y'])
     
-    r = revRayTracing(ply_path_voxels, ply_path_normals, 6, 1)        # 6: Building   1: Flat
-    print(r)
+    # uniformNormals(centroidsCoord_pnt, cornersCoord_pnt)
+    # r = revRayTracing(ply_path_voxels, ply_path_normals, 6, 1)        # 6: Building   1: Flat
+    # print(r)
     
     print('\n\nFinished\n')
