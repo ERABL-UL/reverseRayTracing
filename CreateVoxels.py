@@ -42,9 +42,7 @@ def preparationVoxels(name_scalar, ply_path_horiz):
     lbl = pntCloud[name_scalar]
     zeros_col = np.zeros(x.shape)
     points = np.c_[x, y, z, lbl, zeros_col, zeros_col, zeros_col]
-    
-    ply_path_horiz = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz.ply"            # Enlever apres debuggage
-    
+        
     # Point cloud of facades with normals
     pntCloudFacades = ost.read_ply(ply_path_horiz)
     x = pntCloudFacades["x"]
@@ -57,10 +55,13 @@ def preparationVoxels(name_scalar, ply_path_horiz):
     
     del x, y, z, nx, ny, nz, lbl                 # Freeing space, useful when debugging
     
-    # Give normals from facades to the same facades' points in the hole point cloud
+    # Give normals from facades to the same facades' points from the complet point cloud
     kdtree = KDTree(points[:, :3])
     _, indices = kdtree.query(pointsFacades[:, :3], k=1, distance_upper_bound=0.00001, workers=24)
     points[:, 4:][indices] = pointsFacades[:, 3:]
+    
+    ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/complete_with_normals.ply", points, ["x","y","z","lbl","nx","ny","nz"])
+    print("A ply file containing the complete point cloud with the normals has been created here: {}".format("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/complete_with_normals.ply"))
     
     return points
     
@@ -171,9 +172,10 @@ def findCenters(img_path):
             
     # Uncomment to visialize
     # Note that the image will be mirrored because the origin of the image is at the top left corner
-    cv2.imshow("Bounding Rectangles", inputCopy)
-    cv2.waitKey()
-    cv2.destroyAllWindows()
+    
+    # cv2.imshow("Bounding Rectangles", inputCopy)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
     
     return np.asarray(centroids).astype(float), np.asarray(cornerCoord).astype(float)
 
@@ -186,13 +188,16 @@ def coordsImgToPnt(centroidsCoord_img, cornerCoord_img, xMin, yMin):
     
     centroidCoord_pnt[:,0] += xMin
     centroidCoord_pnt[:,1] += yMin
+    np.hstack((centroidCoord_pnt, np.zeros([centroidCoord_pnt.shape[0],1])))
     
     cornerCoord_pnt = cornerCoord_img.copy()
-    for pnts in cornerCoord_pnt:
-        pnts[:,0] /= 2
-        pnts[:,1] /= 2
-        
-        pnts[:,0] += xMin
-        pnts[:,1] += yMin
+    # print(cornerCoord_pnt[0][1][0][0])
     
+    for i in np.arange(len(cornerCoord_pnt)):
+        cornerCoord_pnt[i] = np.array(cornerCoord_pnt[i], dtype=float)
+        
+        for j in np.arange(len(cornerCoord_pnt[i])):
+            cornerCoord_pnt[i][j][0] = (cornerCoord_pnt[i][j][0] / 2.) + xMin
+            cornerCoord_pnt[i][j][1] = (cornerCoord_pnt[i][j][1] / 2.) + yMin
+
     return centroidCoord_pnt, cornerCoord_pnt

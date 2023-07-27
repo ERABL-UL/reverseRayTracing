@@ -12,7 +12,8 @@ from utils import Config
 import OSToolBox as ost
 from os.path import join
 from sklearn.neighbors import NearestNeighbors
-import cv2 as cv
+import cv2
+from shapely.geometry import Point, Polygon
 
 
 def compute_surface_normals(radius, nn, file_path_read, file_name_out):
@@ -107,3 +108,45 @@ def compute_surface_normals_RG(nn, file_path_read, file_name_out):
     print("###################")
         
     return ply_path_normals_RG
+
+
+def uniformNormals(centroidsCoord_pnt, cornersCoord_pnt, ply_path_horiz):
+    config = Config
+    
+    print("\n###################")
+    print("Pointing normals toward the outside of the buildings ...")
+    
+    cloudFacade = ost.read_ply(ply_path_horiz)
+    
+    points_normals = np.c_[cloudFacade["x"], cloudFacade["y"], cloudFacade["z"], cloudFacade["nx"], cloudFacade["ny"], cloudFacade["nz"]]          # No need for cloudFacade["z"]
+    
+    from datetime import datetime
+    
+    dt = datetime.now()
+    print(dt)
+    mask = []
+    for i in np.arange(points_normals.shape[0]):
+        pnt_p = Point(points_normals[i][0], points_normals[i][1])
+        pnt_plus_normal = points_normals[i][0:2] + points_normals[i][3:5]
+        pnt_xy = points_normals[i][0:2]
+        for j in np.arange(cornersCoord_pnt.shape[0]):
+            cCoord = cornersCoord_pnt[j]
+            poly_p0 = (cCoord[0][0], cCoord[0][1])
+            poly_p1 = (cCoord[1][0], cCoord[1][1])
+            poly_p2 = (cCoord[2][0], cCoord[2][1])
+            poly_p3 = (cCoord[3][0], cCoord[3][1])
+            poly = Polygon([poly_p0, poly_p1, poly_p2, poly_p3])
+            if poly.contains(pnt_p) is True:
+                mask.append(i)
+                if np.sqrt(np.sum(np.square(pnt_plus_normal - centroidsCoord_pnt[j]))) < np.sqrt(np.sum(np.square(pnt_xy - centroidsCoord_pnt[j]))):
+                    points_normals[i][3:] *= -1
+                    break
+            
+    points_normals_inCntrs = points_normals[mask]
+    print(datetime.now() - dt) # 0:06:51.842991 (H:MM:SS)
+    print()
+    
+    ply_path_normals_rect = join(config.folder_path_out, "building_horiz_rectif_inCntrs.ply")
+    ost.write_ply(ply_path_normals_rect, points_normals_inCntrs, ["x","y","z","nx","ny","nz"])
+
+    return ply_path_normals_rect
