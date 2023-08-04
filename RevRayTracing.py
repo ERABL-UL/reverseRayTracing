@@ -34,7 +34,7 @@ def revRayTracing(ply_path_voxels, ply_path_normals):
     ny = voxels["ny"]
     nz = voxels["nz"]
     voxels = np.c_[x, y, z, lbl, nx, ny, nz]
-    del x, y, z, nx, ny, nz
+    del x, y, z, lbl, nx, ny, nz
     
     dist_at_angle_0 = 13                   # Meters
     angle_step = np.deg2rad(0.5)    # 0.5 degrees
@@ -42,16 +42,19 @@ def revRayTracing(ply_path_voxels, ply_path_normals):
     
     nb_of_steps = np.ceil((angle_max*2) / angle_step).astype(np.int32)
     
-    idx_building_all = np.where(lbl.astype(np.int32) == 6)[0].astype(np.int32)          # Get indices of all points corresponding to Building
-    idx_flat_all = np.where(lbl.astype(np.int32) == 1)[0].astype(np.int32)              # Get indices of all points corresponding to Flat
+    idx_facade= np.where(voxels[:,4:] != (0.,0.,0.))[0].astype(np.int32)   # Get indices of all facade building points (where normal != 0)
     
-    for idx_building in idx_building_all:
-        current_point = voxels[idx_building][:2]
-        current_normal = voxels[idx_building]
-        for idx_current_ray in np.arange(nb_of_steps):
-            dist_to_travel = dist_at_angle_0 * cos(angle_max - angle_step*idx_current_ray)
+    for idx in np.arange(idx_facade.shape[0]):
+        if voxels[idx_facade[idx]][3] != 6:
+            continue
+        else:
+            current_point = voxels[idx_facade[idx]][:3]
+            current_normal = voxels[idx_facade[idx]][4:]
+            for idx_current_ray in np.arange(nb_of_steps):
+                dist_to_travel = dist_at_angle_0 * cos(angle_max - angle_step*idx_current_ray)
+                # Écrire ensuite un algo qui avance de vxl en vxl tout le long de la trajectoire pour regarder s'il s'y trouve quelque chose, le cas échéant, on enregistre ce voxel avec son lbl
         
-    # voxels[idx_building_all[3]] PAS TOUS LES VOXELS BUILDING QUI ONT UNE NORMAL !?!?
+    # voxels[idx_building_all[3]] PAS TOUS LES VOXELS BUILDING QUI ONT UNE NORMAL car seulement les facades en ont une
         
     num_steps = dist_at_angle_0 * config.voxel_size
     
