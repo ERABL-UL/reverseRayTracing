@@ -57,7 +57,7 @@ def preparationVoxels(name_scalar, ply_path_horiz):
     
     # Give normals from facades to the same facades' points from the complet point cloud
     kdtree = KDTree(points[:, :3])
-    _, indices = kdtree.query(pointsFacades[:, :3], k=1, distance_upper_bound=0.00001, workers=24)
+    _, indices = kdtree.query(pointsFacades[:, :3], k=1, distance_upper_bound=0.001, workers=24)
     points[:, 4:][indices] = pointsFacades[:, 3:]
     
     ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/complete_with_normals.ply", points, ["x","y","z","lbl","nx","ny","nz"])

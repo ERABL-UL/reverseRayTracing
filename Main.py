@@ -12,7 +12,7 @@ from CreateVoxels import preparationVoxels, createBlob, findCenters, coordsImgTo
 from ExtractClass import extractClass
 from ComputeNormals import compute_surface_normals, uniformNormals
 from CheckPerpendicular import checkPerpendicular
-from RevRayTracing import revRayTracing
+from RevRayTracing import createRays, doRevRayTracing
 import OSToolBox as ost
 from OccupancyGrid import generate_occupancy_grid, generate_single_occ_grid
 import numpy as np
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     
     # Recreate Voxel Grid with right facades' normals
     name_scalar = "scalar_pre"
-    points = preparationVoxels(name_scalar, ply_path_horiz = '/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz_rectif_inCntrs.ply')
+    points = preparationVoxels(name_scalar, ply_path_horiz = '/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/building_horiz_rectif_inCntrs.ply') # Creates "/complete_with_normals.ply"
 
 
     # ===================================
@@ -108,8 +108,13 @@ if __name__ == "__main__":
     del points
     # Check which label is the most common in each voxel
     ply_path_voxels = generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_lbl)
+    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"       # For debugging
     
-    # r = revRayTracing(ply_path_voxels, ply_path_normals, 6, 1)        # 6: Building   1: Flat
-    # print(r)
+    ply_path_groups_rays = createRays(ply_path_voxels)
+    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"                  # For debugging
+    
+    r = doRevRayTracing(ply_path_groups_rays, ply_path_voxels)
+    
+    
     
     print('\n\nFinished\n')

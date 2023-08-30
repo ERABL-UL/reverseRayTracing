@@ -86,8 +86,12 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
 
     
     if "normal" in grid_type:
-        single_grid_nor = np.zeros((nb_ligne*nb_col*nb_haut, 3), dtype=float)
         # Iterate through each point in the point cloud
+        normal_not_0 = np.where(histo_grid_nor!=0)
+        max_height_norm = np.max(normal_not_0[2]) + 1
+        histo_grid_nor = histo_grid_nor[:,:,:max_height_norm]
+        single_grid_nor = np.zeros((nb_ligne*nb_col*max_height_norm, 3), dtype=float)
+        
         histo_grid_nor = np.reshape(histo_grid_nor, (-1,))
         normal_not_0 = np.where(histo_grid_nor!=0)
         normal_not_0 = np.vstack(normal_not_0).T
@@ -106,7 +110,8 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
         
     
     if "label" in grid_type:
-        single_grid_lbl = np.zeros((nb_ligne,nb_col,nb_haut), dtype=int)
+        single_grid_lbl = np.zeros((nb_ligne,nb_col,max_height_norm), dtype=int)
+        histo_grid_lbl = histo_grid_lbl[:,:,:max_height_norm]
         # Iterate through each point in the point cloud
         label_not_0 = np.where(histo_grid_lbl!=0)
         label_not_0 = np.vstack(label_not_0).T
@@ -122,7 +127,7 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
         
     
     # Generate voxel grid coordinates
-    x, y, z = np.indices((nb_ligne,nb_col,nb_haut))
+    x, y, z = np.indices((nb_ligne,nb_col,max_height_norm))
     
     # Convert voxel indices to original coordinate system
     x = np.reshape(x, (-1,)) * config.voxel_size + (min_coords[0] + config.voxel_size/2)
