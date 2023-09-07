@@ -106,15 +106,27 @@ if __name__ == "__main__":
     
     histo_grid_nor, histo_grid_lbl, min_coords = generate_occupancy_grid(points, config.voxel_size, grid_type)
     del points
+
     # Check which label is the most common in each voxel
     ply_path_voxels = generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_lbl)
-    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"       # For debugging
-    
-    ply_path_groups_rays = createRays(ply_path_voxels)
-    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"                  # For debugging
-    
-    r = doRevRayTracing(ply_path_groups_rays, ply_path_voxels)
-    
-    
+
+    TEST = True
+    if TEST:
+        ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESToccGrid_norm_lbl.ply"
+        ply_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
+        createRays(ply_path_out, ply_path_voxels)
+
+        ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
+        vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTocclusions_vxls/"
+        doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
+
+    else:
+        ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"
+        ply_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
+        createRays(ply_path_out, ply_path_voxels)
+
+        ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
+        vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occlusions_vxls/"
+        doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
     
     print('\n\nFinished\n')

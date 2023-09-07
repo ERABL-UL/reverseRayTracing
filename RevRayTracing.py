@@ -20,10 +20,12 @@ import OSToolBox as ost
 import numpy as np
 from numpy import cos, tan, pi
 from scipy.spatial import KDTree
+import scipy.spatial as spatial
 
 from tqdm import tqdm
 from datetime import datetime
 
+# import multiprocessing
 
 
 def createRays(ply_path_out, ply_path_voxels):
@@ -35,24 +37,23 @@ def createRays(ply_path_out, ply_path_voxels):
         lbl = voxels["lbl"]
     except:
         lbl = voxels["scalar_lbl"]
+    z_min = np.zeros(shape=x.shape[0])
     nx = voxels["nx"]
     ny = voxels["ny"]
     nz = voxels["nz"]
-    voxels = np.c_[x, y, z, lbl, nx, ny, nz]
-    del x, y, z, lbl, nx, ny, nz
+    voxels = np.c_[x, y, z, lbl, z_min, nx, ny, nz]
+    del x, y, z, lbl, z_min, nx, ny, nz
     
     dist_step = 0.4                        # Distance for only one move
-    dist_at_angle_0 = 13                    # Meters
+    dist_at_angle_0 = 10                    # Meters
     angle_step = np.deg2rad(0.5)            # 0.5 degrees
     angle_max = np.deg2rad(30)              # 60 degrees 
     
     nb_angle_steps = np.ceil((angle_max*2) / angle_step).astype(np.int32)
-    idx_facade = np.where(voxels[:,4:] != (0.,0.,0.))[0].astype(np.int32)   # Get indices of all facade building voxels (where normal != 0)
+    idx_facade = np.where((voxels[:, 6] > 0.) != np.zeros(voxels[:, 6].shape, dtype=bool))[0].astype(np.int32)   # Get indices of all facade building voxels (where normal != 0)
     
-    idx_flat = np.where(voxels[:,3] == 1)[0].astype(np.int32)   # Get indices of all flat voxels to get the min and max
-    # z_min = np.min(voxels[idx_flat][:,2])
-    # z_max = np.max(voxels[idx_flat][:,2])
-    # z_mean = np.mean(voxels[idx_flat][:,2])
+    idx_flat = np.where(voxels[:, 3] == 1)[0].astype(np.int32)   # Get indices of all flat voxels to get the min and max
+
     dist_steps_verti = 4
     nb_dist_steps_verti = dist_steps_verti*2
     
@@ -62,14 +63,14 @@ def createRays(ply_path_out, ply_path_voxels):
     curr_file_number = 0
     
     lst_vxl_facade = []
-    for idx in np.arange(idx_facade.shape[0]):        
-        if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):       # To avoid processing duplicates
-            if curr_file_number%300 == 0: print("{:.2f}% done".format(idx/idx_facade.shape[0]*100))
+    for idx in np.arange(idx_facade.shape[0]):
+        if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):       # To avoid processing duplicate voxels
+            if curr_file_number % 100 == 0: print("{:.2f}% done".format(idx/idx_facade.shape[0]*100))
             lst = []
             lst_vxl_facade.append(set(voxels[idx_facade[idx]]))
             
             starting_vxl_center = voxels[idx_facade[idx]][:3]
-            starting_vxl_normal = voxels[idx_facade[idx]][4:]
+            starting_vxl_normal = voxels[idx_facade[idx]][5:]
             
             angle_x = np.arctan2(starting_vxl_normal[1], starting_vxl_normal[0])
             
@@ -94,23 +95,18 @@ def createRays(ply_path_out, ply_path_voxels):
                 
                 lstTEST = []
                 
-                test_x = np.where(abs(voxels[idx_flat][:,0] - point_ray_interm_x) <= 5, voxels[idx_flat][:,0], 0)
+                test_x = np.where(abs(voxels[idx_flat][:, 0] - point_ray_interm_x) <= 3, voxels[idx_flat][:, 0], 0)
                 test_x = np.where(test_x != 0)
-                test_y = np.where(abs(voxels[idx_flat][:,1] - point_ray_interm_y) <= 5, voxels[idx_flat][:,1], 0)
+                test_y = np.where(abs(voxels[idx_flat][:, 1] - point_ray_interm_y) <= 3, voxels[idx_flat][:, 1], 0)
                 test_y = np.where(test_y != 0)
                 
                 test_x_y = np.append(test_x[0], test_y[0])
                 u, c = np.unique(test_x_y, return_counts=True)
                 lstTEST = u[c > 1]
-                
-                # for elemx in test_x[0]:
-                #     for elemy in test_y[0]:
-                #         if elemx == elemy:
-                #             lstTEST.append(elemx)
                             
                 if lstTEST.size != 0:
-                    z_min = np.min(voxels[idx_flat[lstTEST]][:,2])
-                    # z_center = z_min + (dist_steps_verti/2)
+                    voxels[idx_facade[idx]][4] = np.min(voxels[idx_flat[lstTEST]][:, 2])
+                    current_z_min = np.min(voxels[idx_flat[lstTEST]][:, 2])
                     empty_tour = 0
                     again = False
                     
@@ -133,7 +129,8 @@ def createRays(ply_path_out, ply_path_voxels):
                 
                 for idx_dist_step in np.arange(1, nb_dist_steps+1):
                     ang = angle_x - (angle_max - angle_step*idx_current_ray)
-                    if ang < 0: ang += 2*pi
+                    if ang < 0:
+                        ang += 2*pi
                     
                     if 0 <= ang <= pi or 2*pi < ang:
                         adjustment_x = cos(angle_x - (angle_max - angle_step*idx_current_ray)) * (dist_step * idx_dist_step)
@@ -147,7 +144,7 @@ def createRays(ply_path_out, ply_path_voxels):
                     point_ray_interm_y = starting_vxl_center[1] + adjustment_y
                     
                     for idx_dist_step_verti in np.arange(1, nb_dist_steps_verti+1):
-                        angle = np.arctan2((abs(starting_vxl_center[2]-z_min) - idx_dist_step_verti * dist_step), dist_tot_to_travel)
+                        angle = np.arctan2((abs(starting_vxl_center[2]-current_z_min) - idx_dist_step_verti * dist_step), dist_tot_to_travel)
                         corr_z = np.sqrt(adjustment_x**2 + adjustment_y**2) * tan(angle)
                         point_ray_interm_z = starting_vxl_center[2] - corr_z
                         
@@ -168,22 +165,20 @@ def createRays(ply_path_out, ply_path_voxels):
             name = "{}/rays_{:0{}d}.ply".format(directory, np.int32(curr_file_number), max_file_len)
             curr_file_number += 1
             
-            ost.write_ply(name, np.array(lst), ['x','y','z','idx_ray','idx_dist','idx_height'])
+            ost.write_ply(name, np.array(lst), ['x', 'y', 'z', 'idx_ray', 'idx_dist', 'idx_height'])
             # break
                 
         # break
 
-    # ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/rays.ply", np.array(lst), ['x','y','z','idx_ray','idx_dist','idx_height'])
+    # Rewrite the voxels file we input in the function
+    # We need to do this to put z_min in it
+    ost.write_ply(ply_path_voxels, voxels, ['x', 'y', 'z', 'lbl', 'z_min', 'nx', 'ny', 'nz'])
     print("{}% done".format(100))
-    
-    return "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
 
 
 def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
-    TSTART = datetime.now()
     if not os.path.exists(vxl_path_out): os.makedirs(vxl_path_out)
-    name = "{}occlusions.ply".format(vxl_path_out)
-    
+
     voxels = ost.read_ply(ply_path_voxels)
     x = voxels["x"]
     y = voxels["y"]
@@ -226,7 +221,7 @@ def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
                 current_ray = points_rays[mask_current_ray]
                 order = np.lexsort([current_ray[:, -1]])[::-1]      # Descending sorting
                 current_ray = current_ray[order]                    # Current ray's points sorted from the farthest to nearest 
-                current_ray = current_ray[-25:,:]
+                current_ray = current_ray[-25:, :]
                 occluder = 0                                        # 0 == False
                 
                 for point in current_ray:
@@ -259,46 +254,125 @@ def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
                         try:
                             voxels_occl[:, 4][indice] = int(counts[1]/np.sum(counts)*100)
                         except: pass
-                        
-            
+
         voxels_occl_copy = voxels_occl.copy()
-        voxels_occl_copy = voxels_occl_copy[voxels_occl[:,4] > 0]
+        voxels_occl_copy = voxels_occl_copy[voxels_occl[:, 4] > 0]
         name = "{}occlusions_more_0.ply".format(vxl_path_out)
-        ost.write_ply(name, voxels_occl_copy, ['x','y','z','lbl','occl'])
+        ost.write_ply(name, voxels_occl_copy, ['x', 'y', 'z', 'lbl', 'occl'])
         
         voxels_occl_copy = voxels_occl.copy()
-        voxels_occl_copy = voxels_occl_copy[voxels_occl[:,4] > 50]
+        voxels_occl_copy = voxels_occl_copy[voxels_occl[:, 4] > 50]
         name = "{}occlusions_more_50.ply".format(vxl_path_out)
-        ost.write_ply(name, voxels_occl_copy, ['x','y','z','lbl','occl'])
+        ost.write_ply(name, voxels_occl_copy, ['x', 'y', 'z', 'lbl', 'occl'])
             
         print("\r{:.2f}% of files are done in the current folder".format(100), end="")
     
     # voxels_occl[:, 4] = np.where(voxels_occl[:, 4] > 6, 1, 0)
-    # voxels_occl = voxels_occl[voxels_occl[:,4] > 0]
+    # voxels_occl = voxels_occl[voxels_occl[:, 4] > 0]
     # name = "{}occlusions_last.ply".format(vxl_path_out)
-    # ost.write_ply(name, voxels_occl, ['x','y','z','lbl','occl'])
+    # ost.write_ply(name, voxels_occl, ['x', 'y', 'z', 'lbl', 'occl'])
     
     print("\033[J")
     print("\n{:.2f}% of folders are done\n".format(100))
     print("\r{:.2f}% of files are done in the current folder".format(100), end="")
-    
-    TEND = datetime.now()
-    print(f'Processing time: {TEND-TSTART} [HH:MM:SS]')
-                
-    return 0    
 
 
-# ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"
-# ply_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
-# r = createRays(ply_path_out, ply_path_voxels)
+def getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k):
+    if not os.path.exists(vxl_path_out): os.makedirs(vxl_path_out)
 
-ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESToccGrid_norm_lbl.ply"
-ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
-vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTocclusions_vxls/"
-r = doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
+    voxels = ost.read_ply(ply_path_voxels)
+    x = voxels["x"]
+    y = voxels["y"]
+    z = voxels["z"]
+    z_min = voxels["z_min"]
+    try:
+        lbl = voxels["lbl"]
+    except:
+        lbl = voxels["scalar_lbl"]
+    nx = voxels["nx"]
+    ny = voxels["ny"]
+    nz = voxels["nz"]
+    voxels = np.c_[x, y, z, lbl, z_min, nx, ny, nz]
+    del x, y, z, lbl, z_min, nx, ny, nz
 
+    occlProb = ost.read_ply(occlProb)
+    x = occlProb["x"]
+    y = occlProb["y"]
+    z = occlProb["z"]
+    try:
+        lbl = occlProb["lbl"]
+    except:
+        lbl = occlProb["scalar_lbl"]
+    occl = occlProb["occl"]
+    occlProb = np.c_[x, y, z, lbl, occl]
+    del x, y, z, lbl, occl
 
-# ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"
-# ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
-# vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occlusions_vxls/"
-# r = doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
+    vxls_facade_occl = np.asarray([[0., 0., 0., 0., 0., 0.]])
+
+    idx_facade = np.where(((voxels[:, 5] != 0.) | (voxels[:, 6] != 0.) | (voxels[:, 7] != 0.)) & (voxels[:, 4] != 0.))[0]   # Get indices of all facade building voxels (where normal != 0 and z_min != 0)
+    curr_file_number = 0
+    lst_vxl_facade = []
+
+    idxOcclProbMinMax = np.where((occlProb[:, 4] >= minProb) & (occlProb[:, 4] <= maxProb))[0]
+    occlProb = occlProb[idxOcclProbMinMax]
+    tree = spatial.cKDTree(occlProb[:, :3])
+
+    for idx in tqdm(np.arange(idx_facade.shape[0])):
+        if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):  # To avoid processing duplicate voxels, if there is
+            # if curr_file_number % 100 == 0:
+            #     print("\033[J")
+            #     print("{:.2f}% done".format(idx / idx_facade.shape[0] * 100))
+            lst_vxl_facade.append(set(voxels[idx_facade[idx]]))
+
+            vxl_facade_coord = voxels[idx_facade[idx]][:3]
+            vxl_facade_z_min = voxels[idx_facade[idx]][4]
+            vxls_under = np.where((voxels[:, 3] == 0) & (voxels[:, 2] >= vxl_facade_z_min) & (voxels[:, 0] == vxl_facade_coord[0]) & (voxels[:, 1] == vxl_facade_coord[1]) & (voxels[:, 2] < vxl_facade_coord[2]))[0]
+            # Ajouter une condition de probabilité d'occlusion ICI
+
+            if vxls_under.shape[0] != 0:
+                for vxl in vxls_under:
+                    idxCurrOccl = np.where((occlProb[:, 0] == voxels[vxl][0]) & (occlProb[:, 1] == voxels[vxl][1]) & (occlProb[:, 2] == voxels[vxl][2]))[0]
+                    if idxCurrOccl.shape[0] != 0:
+                        idxCurrOccl = idxCurrOccl[0]
+                        indice = tree.query_ball_point(occlProb[idxCurrOccl][:3], 0.71)
+                        if len(indice) > k:
+                            vxls_facade_occl = np.append(vxls_facade_occl, [np.append([occlProb[idxCurrOccl]], len(indice))], axis=0)
+
+            curr_file_number += 1
+
+    directory = "{}TESTvxls_facade_occl_{}to{}_k{}.ply".format(vxl_path_out, minProb, maxProb, k)
+    ost.write_ply(directory, vxls_facade_occl, ['x', 'y', 'z', 'lbl', 'occl', 'k'])
+    print("{:.2f}% done".format(100))
+
+TSTART = datetime.now()
+
+TEST = True
+minProb = 60
+maxProb = 100
+k = 4
+if TEST:
+    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESToccGrid_norm_lbl.ply"
+    ply_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
+    # createRays(ply_path_out, ply_path_voxels)
+
+    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
+    vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTocclusions_vxls/"
+    # doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
+
+    occlProb = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTocclusions_vxls/occlusions_more_0.ply"
+    getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k)
+
+else:
+    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"
+    ply_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
+    createRays(ply_path_out, ply_path_voxels)
+
+    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
+    vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occlusions_vxls/"
+    doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
+
+    occlProb = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occlusions_vxls/occlusions_more_50.ply"
+    getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k)
+
+TEND = datetime.now()
+print(f'Processing time: {TEND-TSTART} [HH:MM:SS]')
