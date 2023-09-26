@@ -8,12 +8,14 @@ Created on Wed Jun 14 13:22:33 2023
 
 import numpy as np
 from collections import Counter
-from utils import Config
+from utils import Config as config
 from os.path import join
 import OSToolBox as ost
+from tqdm import tqdm
 
 
-def generate_occupancy_grid(points, voxel_size, grid_type):
+def generate_occupancy_grid(points, grid_type):
+    voxel_size = config.voxel_size
     print("  - Generating the occupancy grid ...")
     # Determine the minimum and maximum coordinates of the point cloud
     min_coords = np.min(points, axis=0)[:3]
@@ -31,7 +33,7 @@ def generate_occupancy_grid(points, voxel_size, grid_type):
 
     if "normal" and "label" in grid_type:
         # Iterate through each point in the point cloud
-        for i in np.arange(points.shape[0]):
+        for i in tqdm(np.arange(points.shape[0])):
             voxel_indices = np.floor((points[i][:3] - min_coords) / voxel_size).astype(int)
             # Transfert the normals of all the facades points in each voxel with at least one facade point
             if histo_grid_nor[tuple(voxel_indices)] == 0 and (points[i][4:] != [0., 0., 0.]).all():
@@ -49,7 +51,7 @@ def generate_occupancy_grid(points, voxel_size, grid_type):
     elif "normal" in grid_type:
         histo_grid_lbl = None
         # Iterate through each point in the point cloud
-        for i in np.arange(points.shape[0]):
+        for i in tqdm(np.arange(points.shape[0])):
             # Calculate the voxel indices for the current point
             voxel_indices = np.floor((points[i][:3] - min_coords) / voxel_size).astype(int)
             
@@ -63,7 +65,7 @@ def generate_occupancy_grid(points, voxel_size, grid_type):
     elif "label" in grid_type:
         histo_grid_nor = None
         # Iterate through each point in the point cloud
-        for i in np.arange(points.shape[0]):
+        for i in tqdm(np.arange(points.shape[0])):
             # Calculate the voxel indices for the current point
             voxel_indices = np.floor((points[i][:3] - min_coords) / voxel_size).astype(int)
             # Transfert the labels of all the points in each voxel
@@ -76,16 +78,16 @@ def generate_occupancy_grid(points, voxel_size, grid_type):
     
     return histo_grid_nor, histo_grid_lbl, min_coords
 
+
 def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_lbl=None):
-    config=Config
-    print("  - Generating occupancy grid with the most popular label in each voxel ...")
-    
+    voxel_size = config.voxel_size
     nb_ligne = histo_grid_nor.shape[0]
     nb_col = histo_grid_nor.shape[1]
     nb_haut = histo_grid_nor.shape[2]
 
     
     if "normal" in grid_type:
+        print("  - Generating occupancy grid with the median normal of each voxel ...")
         # Iterate through each point in the point cloud
         normal_not_0 = np.where(histo_grid_nor!=0)
         max_height_norm = np.max(normal_not_0[2]) + 1
@@ -110,6 +112,7 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
         
     
     if "label" in grid_type:
+        print("  - Generating occupancy grid with the most popular label in each voxel ...")
         single_grid_lbl = np.zeros((nb_ligne,nb_col,max_height_norm), dtype=int)
         histo_grid_lbl = histo_grid_lbl[:,:,:max_height_norm]
         # Iterate through each point in the point cloud
@@ -130,9 +133,9 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
     x, y, z = np.indices((nb_ligne,nb_col,max_height_norm))
     
     # Convert voxel indices to original coordinate system
-    x = np.reshape(x, (-1,)) * config.voxel_size + (min_coords[0] + config.voxel_size/2)
-    y = np.reshape(y, (-1,)) * config.voxel_size + (min_coords[1] + config.voxel_size/2)
-    z = np.reshape(z, (-1,)) * config.voxel_size + (min_coords[2] + config.voxel_size/2)
+    x = np.reshape(x, (-1,)) * voxel_size + (min_coords[0] + voxel_size/2)
+    y = np.reshape(y, (-1,)) * voxel_size + (min_coords[1] + voxel_size/2)
+    z = np.reshape(z, (-1,)) * voxel_size + (min_coords[2] + voxel_size/2)
     
     if "normal" and "label" in grid_type:
         p = np.c_[x,y,z,single_grid_lbl,single_grid_nor[:,0],single_grid_nor[:,1],single_grid_nor[:,2]]
@@ -153,8 +156,8 @@ def generate_single_occ_grid(histo_grid_nor, grid_type, min_coords, histo_grid_l
         ost.write_ply(ply_path_voxels, p, ["x","y","z","lbl"])
     
     del p
-    print("Voxels created with success!\nA ply file has been created here: {}".format(ply_path_voxels))
+    print("Voxels created with success!\nA ply file has been created here: {}\n".format(ply_path_voxels))
     
-    print("###################")
+    print()
     
     return ply_path_voxels

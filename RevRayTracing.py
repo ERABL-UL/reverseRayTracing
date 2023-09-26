@@ -24,7 +24,6 @@ import scipy.spatial as spatial
 from sklearn.cluster import DBSCAN
 
 from tqdm import tqdm
-from datetime import datetime
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -56,9 +55,9 @@ def createRays(ply_path_out, ply_path_voxels):
     del x, y, z, lbl, z_min, nx, ny, nz
     
     dist_step = 0.4                        # Distance for only one move
-    dist_at_angle_0 = 10                    # Meters
+    dist_at_angle_0 = 15                    # Meters
     angle_step = np.deg2rad(0.5)            # 0.5 degrees
-    angle_max = np.deg2rad(30)              # 60 degrees 
+    angle_max = np.deg2rad(35)              # 70 degrees
     
     nb_angle_steps = np.ceil((angle_max*2) / angle_step).astype(np.int32)
     idx_facade = np.where((voxels[:, 6] != 0.) != np.zeros(voxels[:, 6].shape, dtype=bool))[0].astype(np.int32)   # Get indices of all facade building voxels (where normal != 0)
@@ -74,121 +73,118 @@ def createRays(ply_path_out, ply_path_voxels):
     curr_file_number = 0
     
     lst_vxl_facade = []
-    with tqdm(total=100) as pbar:
-        for idx in np.arange(idx_facade.shape[0]):
-            if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):       # To avoid processing duplicate voxels
-                if curr_file_number % 100 == 0: pbar.update()  #print("{:.2f}% done".format(idx/idx_facade.shape[0]*100))
-                lst = []
-                lst_vxl_facade.append(set(voxels[idx_facade[idx]]))
+    for idx in tqdm(np.arange(idx_facade.shape[0])):
+        if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):       # To avoid processing duplicate voxels
+            lst = []
+            lst_vxl_facade.append(set(voxels[idx_facade[idx]]))
 
-                starting_vxl_center = voxels[idx_facade[idx]][:3]
-                starting_vxl_normal = voxels[idx_facade[idx]][5:]
+            starting_vxl_center = voxels[idx_facade[idx]][:3]
+            starting_vxl_normal = voxels[idx_facade[idx]][5:]
 
-                angle_x = np.arctan2(starting_vxl_normal[1], starting_vxl_normal[0])
+            angle_x = np.arctan2(starting_vxl_normal[1], starting_vxl_normal[0])
 
-                go_to_next = False
-                again = True
-                empty_tour = 0
-                while again:
-                    ################################
-                    # Check the height of the street in front of the facade's voxel
-                    if angle_x < 0: angle_x += 2*pi
+            go_to_next = False
+            again = True
+            empty_tour = 0
+            while again:
+                ################################
+                # Check the height of the street in front of the facade's voxel
+                if angle_x < 0: angle_x += 2*pi
 
-                    if 0 <= angle_x <= pi:
-                        adjustment_x = cos(angle_x) * dist_at_angle_0
-                        adjustment_y = np.sqrt(dist_at_angle_0**2 - adjustment_x**2)
+                if 0 <= angle_x <= pi:
+                    adjustment_x = cos(angle_x) * dist_at_angle_0
+                    adjustment_y = np.sqrt(dist_at_angle_0**2 - adjustment_x**2)
+
+                else:
+                    adjustment_x = cos(angle_x) * dist_at_angle_0
+                    adjustment_y = -np.sqrt(dist_at_angle_0**2 - adjustment_x**2)
+
+                point_ray_interm_x = starting_vxl_center[0] + adjustment_x
+                point_ray_interm_y = starting_vxl_center[1] + adjustment_y
+
+                lstTEST = []
+
+                test_x = np.where(abs(voxels[idx_flat][:, 0] - point_ray_interm_x) <= 3, voxels[idx_flat][:, 0], 0)     # The end of the ray must be at least 3 meters from the road
+                test_x = np.where(test_x != 0)
+                test_y = np.where(abs(voxels[idx_flat][:, 1] - point_ray_interm_y) <= 3, voxels[idx_flat][:, 1], 0)     # The end of the ray must be at least 3 meters from the road
+                test_y = np.where(test_y != 0)
+
+                test_x_y = np.append(test_x[0], test_y[0])
+                u, c = np.unique(test_x_y, return_counts=True)
+                lstTEST = u[c > 1]
+
+                if lstTEST.size != 0:
+                    voxels[idx_facade[idx]][4] = np.min(voxels[idx_flat[lstTEST]][:, 2])
+                    current_z_min = np.min(voxels[idx_flat[lstTEST]][:, 2])
+                    empty_tour = 0
+                    again = False
+
+                else:
+                    angle_x = np.arctan2(-starting_vxl_normal[1], -starting_vxl_normal[0])
+                    empty_tour += 1
+
+                    if empty_tour > 1:
+                        go_to_next = True
+                        break
+
+            if go_to_next:
+                continue
+
+                ################################
+
+            for idx_current_ray in np.arange(nb_angle_steps):
+                dist_tot_to_travel = dist_at_angle_0 / cos(angle_max - angle_step*idx_current_ray)
+                nb_dist_steps = np.ceil(dist_tot_to_travel / dist_step)         # Number of time we have to move forward in the current ray
+
+                for idx_dist_step in np.arange(1, nb_dist_steps+1):
+                    ang = angle_x - (angle_max - angle_step*idx_current_ray)
+                    if ang < 0:
+                        ang += 2*pi
+
+                    if 0 <= ang <= pi or 2*pi < ang:
+                        adjustment_x = cos(angle_x - (angle_max - angle_step*idx_current_ray)) * (dist_step * idx_dist_step)
+                        adjustment_y = np.sqrt((dist_step * idx_dist_step)**2 - adjustment_x**2)
 
                     else:
-                        adjustment_x = cos(angle_x) * dist_at_angle_0
-                        adjustment_y = -np.sqrt(dist_at_angle_0**2 - adjustment_x**2)
+                        adjustment_x = cos(angle_x - (angle_max - angle_step*idx_current_ray)) * (dist_step * idx_dist_step)
+                        adjustment_y = -np.sqrt((dist_step * idx_dist_step)**2 - adjustment_x**2)
 
                     point_ray_interm_x = starting_vxl_center[0] + adjustment_x
                     point_ray_interm_y = starting_vxl_center[1] + adjustment_y
 
-                    lstTEST = []
+                    for idx_dist_step_verti in np.arange(1, nb_dist_steps_verti+1):
+                        angle = np.arctan2((abs(starting_vxl_center[2]-current_z_min) - idx_dist_step_verti * dist_step), dist_tot_to_travel)
+                        corr_z = np.sqrt(adjustment_x**2 + adjustment_y**2) * tan(angle)
+                        point_ray_interm_z = starting_vxl_center[2] - corr_z
 
-                    test_x = np.where(abs(voxels[idx_flat][:, 0] - point_ray_interm_x) <= 3, voxels[idx_flat][:, 0], 0)     # The end of the ray must be at least 3 meters from the road
-                    test_x = np.where(test_x != 0)
-                    test_y = np.where(abs(voxels[idx_flat][:, 1] - point_ray_interm_y) <= 3, voxels[idx_flat][:, 1], 0)     # The end of the ray must be at least 3 meters from the road
-                    test_y = np.where(test_y != 0)
+                        idx_ray = idx_current_ray*nb_dist_steps_verti + (idx_dist_step_verti - 1)
+                        idx_dist = idx_dist_step - 1
+                        idx_height = idx_dist_step_verti - 1
 
-                    test_x_y = np.append(test_x[0], test_y[0])
-                    u, c = np.unique(test_x_y, return_counts=True)
-                    lstTEST = u[c > 1]
+                        lst.append([point_ray_interm_x, point_ray_interm_y, point_ray_interm_z, idx_ray, idx_dist, idx_height])
 
-                    if lstTEST.size != 0:
-                        voxels[idx_facade[idx]][4] = np.min(voxels[idx_flat[lstTEST]][:, 2])
-                        current_z_min = np.min(voxels[idx_flat[lstTEST]][:, 2])
-                        empty_tour = 0
-                        again = False
+            if curr_file_number % 500 == 0:
+                curr_folder_number += 1
 
-                    else:
-                        angle_x = np.arctan2(-starting_vxl_normal[1], -starting_vxl_normal[0])
-                        empty_tour += 1
+            directory = "{}groupedRays_{:0{}d}".format(ply_path_out, curr_folder_number, max_folder_len)
 
-                        if empty_tour > 1:
-                            go_to_next = True
-                            break
+            if not os.path.exists(directory):
+                os.makedirs(directory)
 
-                if go_to_next:
-                    continue
+            name = "{}/rays_{:0{}d}.ply".format(directory, np.int32(curr_file_number), max_file_len)
+            curr_file_number += 1
 
-                    ################################
-
-                for idx_current_ray in np.arange(nb_angle_steps):
-                    dist_tot_to_travel = dist_at_angle_0 / cos(angle_max - angle_step*idx_current_ray)
-                    nb_dist_steps = np.ceil(dist_tot_to_travel / dist_step)         # Number of time we have to move forward in the current ray
-
-                    for idx_dist_step in np.arange(1, nb_dist_steps+1):
-                        ang = angle_x - (angle_max - angle_step*idx_current_ray)
-                        if ang < 0:
-                            ang += 2*pi
-
-                        if 0 <= ang <= pi or 2*pi < ang:
-                            adjustment_x = cos(angle_x - (angle_max - angle_step*idx_current_ray)) * (dist_step * idx_dist_step)
-                            adjustment_y = np.sqrt((dist_step * idx_dist_step)**2 - adjustment_x**2)
-
-                        else:
-                            adjustment_x = cos(angle_x - (angle_max - angle_step*idx_current_ray)) * (dist_step * idx_dist_step)
-                            adjustment_y = -np.sqrt((dist_step * idx_dist_step)**2 - adjustment_x**2)
-
-                        point_ray_interm_x = starting_vxl_center[0] + adjustment_x
-                        point_ray_interm_y = starting_vxl_center[1] + adjustment_y
-
-                        for idx_dist_step_verti in np.arange(1, nb_dist_steps_verti+1):
-                            angle = np.arctan2((abs(starting_vxl_center[2]-current_z_min) - idx_dist_step_verti * dist_step), dist_tot_to_travel)
-                            corr_z = np.sqrt(adjustment_x**2 + adjustment_y**2) * tan(angle)
-                            point_ray_interm_z = starting_vxl_center[2] - corr_z
-
-                            idx_ray = idx_current_ray*nb_dist_steps_verti + (idx_dist_step_verti - 1)
-                            idx_dist = idx_dist_step - 1
-                            idx_height = idx_dist_step_verti - 1
-
-                            lst.append([point_ray_interm_x, point_ray_interm_y, point_ray_interm_z, idx_ray, idx_dist, idx_height])
-
-                if curr_file_number % 500 == 0:
-                    curr_folder_number += 1
-
-                directory = "{}groupedRays_{:0{}d}".format(ply_path_out, curr_folder_number, max_folder_len)
-
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
-
-                name = "{}/rays_{:0{}d}.ply".format(directory, np.int32(curr_file_number), max_file_len)
-                curr_file_number += 1
-
-                ost.write_ply(name, np.array(lst), ['x', 'y', 'z', 'idx_ray', 'idx_dist', 'idx_height'])
-                # break
+            ost.write_ply(name, np.array(lst), ['x', 'y', 'z', 'idx_ray', 'idx_dist', 'idx_height'])
+            # break
                 
         # break
 
     # Rewrite the voxels file we input in the function
     # This is important because it creates the z_min column
     ost.write_ply(ply_path_voxels, voxels, ['x', 'y', 'z', 'lbl', 'z_min', 'nx', 'ny', 'nz'])
-    print("{}% done".format(100))
 
 
-def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
+def revRayTracingFunction(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
     # print("Beginning function doRevRayTracing()...")
     if not os.path.exists(vxl_path_out): os.makedirs(vxl_path_out)
 
@@ -212,15 +208,8 @@ def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
 
     # print("Starting reversed ray tracing...")
     for folder_num, folder in enumerate(ost.getDirBySubstr(ply_path_groups_rays, "groupedRays")):
-        outer_progress = custom_progress_bar("Folder Task", folder_num, count_folders)
-        # print("\033[J")
-        # print("{:.2f}% of folders are done\n".format(folder_num/count_folders*100))
-        
         count_files = len(ost.getFileByExt(folder, "ply"))
-        for file_num, file in enumerate(ost.getFileByExt(folder, "ply")):
-            inner_progress = custom_progress_bar("Files Task", file_num, count_files)
-            print(outer_progress + "      " + inner_progress, end='\r')
-            # print("\r{:.2f}% of files are done in the current folder".format(file_num/count_files*100), end="")
+        for file_num, file in tqdm(enumerate(ost.getFileByExt(folder, "ply")), desc=str(folder_num)+"/"+str(count_folders)):
             # File represent the rays from one voxel
             rays = ost.read_ply(file)
             x = rays["x"]
@@ -276,15 +265,15 @@ def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
                             voxels_occl[:, 4][indice] = int(counts[1]/np.sum(counts)*100)
                         except: pass
 
-        voxels_occl_copy = voxels_occl.copy()
-        voxels_occl_copy = voxels_occl_copy[voxels_occl[:, 4] > 0]
+        voxels_0 = voxels_occl.copy()
+        voxels_0 = voxels_0[voxels_occl[:, 4] > 0]
         name = "{}occlusions_more_0.ply".format(vxl_path_out)
-        ost.write_ply(name, voxels_occl_copy, ['x', 'y', 'z', 'lbl', 'occl'])
+        ost.write_ply(name, voxels_0, ['x', 'y', 'z', 'lbl', 'occl'])
         
-        voxels_occl_copy = voxels_occl.copy()
-        voxels_occl_copy = voxels_occl_copy[voxels_occl[:, 4] > 50]
+        voxels_50 = voxels_occl.copy()
+        voxels_50 = voxels_50[voxels_occl[:, 4] > 50]
         name = "{}occlusions_more_50.ply".format(vxl_path_out)
-        ost.write_ply(name, voxels_occl_copy, ['x', 'y', 'z', 'lbl', 'occl'])
+        ost.write_ply(name, voxels_50, ['x', 'y', 'z', 'lbl', 'occl'])
             
         # print("\r{:.2f}% of files are done in the current folder".format(100), end="")
     print()
@@ -301,7 +290,7 @@ def doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out):
 
 def getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, TEST):
     # if not os.path.exists(vxl_path_out): os.makedirs(vxl_path_out)
-
+    print("\n###################\nExtracting groups of voxels forming facades' occlusions...")
     voxels = ost.read_ply(ply_path_voxels)
     x = voxels["x"]
     y = voxels["y"]
@@ -339,21 +328,28 @@ def getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, 
     occlProb = occlProb[idxOcclProbMinMax]
 
     for idx in tqdm(np.arange(idx_facade.shape[0])):
-        # To avoid processing duplicate voxels, if there is
+        # To avoid processing duplicate voxels, if there is any
         if voxels[idx_facade[idx]][3] == 6 and not np.any(np.isin(lst_vxl_facade, set(voxels[idx_facade[idx]]))):
             lst_vxl_facade.append(set(voxels[idx_facade[idx]]))
 
             vxl_facade_coord = voxels[idx_facade[idx]][:3]
             vxl_facade_z_min = voxels[idx_facade[idx]][4]
-            vxls_under = np.where((voxels[:, 3] == 0) & (voxels[:, 2] >= vxl_facade_z_min) & (voxels[:, 0] == vxl_facade_coord[0]) & (voxels[:, 1] == vxl_facade_coord[1]) & (voxels[:, 2] < vxl_facade_coord[2]))[0]
+            vxls_under = np.where((voxels[:, 3] == 0) &
+                                  (voxels[:, 2] >= vxl_facade_z_min-0.5) &
+                                  (voxels[:, 0] == vxl_facade_coord[0]) &
+                                  (voxels[:, 1] == vxl_facade_coord[1]) &
+                                  (voxels[:, 2] <= vxl_facade_coord[2]))[0]
 
             if vxls_under.shape[0] != 0:
                 for vxl in vxls_under:
-                    idxCurrOccl = np.where((occlProb[:, 0] == voxels[vxl][0]) & (occlProb[:, 1] == voxels[vxl][1]) & (occlProb[:, 2] == voxels[vxl][2]))[0]
+                    idxCurrOccl = np.where(np.isclose(occlProb[:, 0], voxels[vxl][0], atol=0.1) &
+                                           np.isclose(occlProb[:, 1], voxels[vxl][1], atol=0.1) &
+                                           np.isclose(occlProb[:, 2], voxels[vxl][2], atol=0.1))[0]
                     if idxCurrOccl.shape[0] != 0:
                         vxls_facade_occl = np.append(vxls_facade_occl, occlProb[idxCurrOccl], axis=0)
 
     # Filter voxels by a minimum number of neighbors
+    print("Filtering voxels by a minimum number of neighbors of {}...".format(k))
     vxls_facade_occl = np.unique(vxls_facade_occl, axis=0)
     tree = spatial.cKDTree(vxls_facade_occl[1:, :3])
     indices = []
@@ -366,6 +362,10 @@ def getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, 
             indices.append(indice)
             vxls_facade_occl_k = np.append(vxls_facade_occl_k, [np.append([vxl], 0)], axis=0)
 
+    directory = "{}vxls_facade_occl_{}to{}_k{}.ply".format(vxl_path_out, minProb, maxProb, k)
+    ost.write_ply(directory, vxls_facade_occl_k, ['x', 'y', 'z', 'lbl', 'occl', 'cluster_idx'])
+
+    print("Labeling each clusters...")
     vxls_facade_occl_k = vxls_facade_occl_k[1:]
     # Segmenting clusters of facade occlusions
     eps = 1  # Adjust this value based on your data and clustering requirements
@@ -376,45 +376,12 @@ def getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, 
     vxls_facade_occl_k[:, -1] = labels
     vxls_facade_occl_k = vxls_facade_occl_k[labelsMask]
 
+    print("Voxels and clusters created with success!")
     if TEST:
         directory = "{}TESTvxls_facade_occl_{}to{}_k{}.ply".format(vxl_path_out, minProb, maxProb, k)
     else:
         directory = "{}vxls_facade_occl_{}to{}_k{}.ply".format(vxl_path_out, minProb, maxProb, k)
 
-    ost.write_ply(directory, vxls_facade_occl_k, ['x', 'y', 'z', 'lbl', 'occl', 'cluster_idx'])
-    print("{:.2f}% done".format(100))
+    # ost.write_ply(directory, vxls_facade_occl_k, ['x', 'y', 'z', 'lbl', 'occl', 'cluster_idx'])
 
-    return
-
-
-
-TSTART = datetime.now()
-
-TEST = False
-minProb = 60
-maxProb = 100
-k = 4
-if TEST:
-    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESToccGrid_norm_lbl.ply"
-    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTallRays/"
-    # createRays(ply_path_groups_rays, ply_path_voxels)
-
-    vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/TESTocclusions_vxls/"
-    # doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
-
-    occlProb = vxl_path_out + "TESTocclusions_more_0.ply"
-    getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, TEST)
-
-else:
-    ply_path_voxels = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occGrid_norm_lbl.ply"
-    ply_path_groups_rays = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/allRays/"
-    # createRays(ply_path_groups_rays, ply_path_voxels)
-
-    vxl_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/occlusions_vxls/"
-    doRevRayTracing(ply_path_groups_rays, ply_path_voxels, vxl_path_out)
-
-    occlProb = vxl_path_out + "occlusions_more_0.ply"
-    getFacadeOccl(ply_path_voxels, vxl_path_out, occlProb, minProb, maxProb, k, TEST)
-
-TEND = datetime.now()
-print(f'Processing time: {TEND-TSTART} [HH:MM:SS]')
+    print("A ply file has been created here: {}".format(directory))

@@ -30,7 +30,7 @@ from scipy.spatial import KDTree
 def preparationVoxels(name_scalar, ply_path_horiz):
     config = Config
     print("\n###################")
-    print("Creating voxels of {} meters from point cloud {} ...".format(config.voxel_size, config.file_name_read))
+    print("Transfering facades' normals to the same facades' points from the complet point cloud ...")
     
     file_path_read = join(config.folder_path_in, config.file_name_read)
     pntCloud = ost.read_ply(file_path_read)
@@ -60,14 +60,14 @@ def preparationVoxels(name_scalar, ply_path_horiz):
     _, indices = kdtree.query(pointsFacades[:, :3], k=1, distance_upper_bound=0.001, workers=24)
     points[:, 4:][indices] = pointsFacades[:, 3:]
     
-    ost.write_ply("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/complete_with_normals.ply", points, ["x","y","z","lbl","nx","ny","nz"])
-    print("A ply file containing the complete point cloud with the normals has been created here: {}".format("/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/complete_with_normals.ply"))
+    ost.write_ply(join(config.folder_path_out, "complete_with_normals.ply"), points, ["x","y","z","lbl","nx","ny","nz"])
+    print("A ply file containing the complete point cloud with the normals and labels has been created here:\n{}".format(join(config.folder_path_out, "complete_with_normals.ply")))
     
     return points
     
 
 
-def createBlob(voxels_path, label, grid_type):
+def createBlob(voxels_path, grid_type, label=None):
     config = Config
     
     # voxels_path = join(config.folder_path_out,"occGrid.ply")
@@ -131,7 +131,7 @@ def findCenters(img_path):
     _, binaryImage = cv2.threshold(grayInput, 0, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
     
     # Set kernel (structuring element) size:
-    kernelSize = (1, 1)
+    kernelSize = (2, 2)
     
     # Set operation iterations:
     opIterations = 10

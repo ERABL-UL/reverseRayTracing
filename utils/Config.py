@@ -6,10 +6,12 @@ Created on Tue Jun 13 09:17:01 2023
 @author: willalbert
 """
 
-folder_path_in = "/home/willalbert/Documents/GitHub/KPConvPyTorch/test/Log_2023-06-02_15-18-46_FT_BON/predictions"
-folder_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT"
+# folder_path_in = "/home/willalbert/Documents/GitHub/KPConvPyTorch/test/Log_2023-06-02_15-18-46_FT_BON/predictions"
+folder_path_in = "/home/willalbert/Documents/GitHub/reverseRayTracing/INPUTS/DEMO"
+folder_path_out = "/home/willalbert/Documents/GitHub/reverseRayTracing/OUT/DEMO"
 
-file_name_read = "89_merged.ply"
+# file_name_read = "89_merged.ply"
+file_name_read = "simulation_segm.ply"
 #folder_path = "/home/willalbert/Documents/GitHub/KPConvPyTorch/test/Log_2023-06-02_15-18-46_FT_BON/predictions"
 
 file_name_prob = "segmentedSteMarthePROB.ply"
